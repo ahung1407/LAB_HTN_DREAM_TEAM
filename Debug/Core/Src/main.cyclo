@@ -1,6 +1,6 @@
 ../Core/Src/main.c:72:5:main	1
-../Core/Src/main.c:131:6:SystemClock_Config	3
-../Core/Src/main.c:171:6:system_init	1
-../Core/Src/main.c:181:6:UpdateTime	1
-../Core/Src/main.c:191:6:DisplayTime	3
-../Core/Src/main.c:226:6:Error_Handler	1
+../Core/Src/main.c:137:6:SystemClock_Config	3
+../Core/Src/main.c:177:6:system_init	1
+../Core/Src/main.c:187:6:UpdateTime	1
+../Core/Src/main.c:197:6:DisplayTime	3
+../Core/Src/main.c:245:6:Error_Handler	1

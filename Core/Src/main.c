@@ -30,7 +30,7 @@
 #include "software_timer.h"
 #include "lcd.h"
 #include "ds3231.h"
-// #include "picture.h" // Tạm thời không sử dụng chức năng hiển thị ảnh
+#include "picture.h" // Tạm thời không sử dụng chức năng hiển thị ảnh
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -109,6 +109,12 @@ int main(void) {
 
 	// Xóa màn hình về màu đen khi khởi động
 	lcd_clear(BLACK);
+	
+	// Ví dụ hiển thị ảnh với kích thước mới (200x45)
+	// Bạn cần đảm bảo mảng gImage_a đã được tạo lại với kích thước tương ứng (18000 bytes)
+	// lcd_show_picture(x, y, width, lenth, image_array);
+	lcd_show_picture(0, 0, 240, 180, gImage_a);
+	lcd_show_picture(100, 220, 140, 80, gImage_b);
 
 	while (1) {
 		ds3231_read_time();
@@ -189,34 +195,47 @@ void UpdateTime() {
 }
 
 void DisplayTime() {
-	// Array for abbreviated day names. Note: DS3231 day is 1-7 (Sun-Sat).
-	const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+    // Array for abbreviated day names. Note: DS3231 day is 1-7 (Sun-Sat).
+    const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+	const uint8_t TIME_FONT_SIZE = 24;
+	const uint8_t INFO_FONT_SIZE = 16;
+	const int y_offset = 20;   // Khoảng cách giữa các dòng
+	int y = 180;               // y bắt đầu cho giờ
 
-	// Hiển thị Giờ : Phút : Giây
-	lcd_show_int_num(70, 100, ds3231_hours, 2, GREEN, BLACK, 24);
-	lcd_show_string(98, 100, ":", GREEN, BLACK, 24, 0);
-	lcd_show_int_num(110, 100, ds3231_min, 2, GREEN, BLACK, 24);
-	lcd_show_string(138, 100, ":", GREEN, BLACK, 24, 0);
-	lcd_show_int_num(150, 100, ds3231_sec, 2, GREEN, BLACK, 24);
-	
-	// Clear the date area before drawing to prevent ghosting
-	lcd_fill(0, 130, 240, 185, BLACK);
+    // Hiển thị Giờ : Phút : Giây
+    // Căn giữa dòng thời gian
+    int time_str_width = 2 * (TIME_FONT_SIZE/2) + 1 * (TIME_FONT_SIZE/2) + 2 * (TIME_FONT_SIZE/2) + 1 * (TIME_FONT_SIZE/2) + 2 * (TIME_FONT_SIZE/2);
+    int x_time_start = (lcddev.width - time_str_width) / 2;
+    lcd_show_int_num(x_time_start, y, ds3231_hours, 2, GREEN, BLACK, TIME_FONT_SIZE);
+    lcd_show_string(x_time_start + 2*(TIME_FONT_SIZE/2), y, ":", GREEN, BLACK, TIME_FONT_SIZE, 0);
+    lcd_show_int_num(x_time_start + 3*(TIME_FONT_SIZE/2), y, ds3231_min, 2, GREEN, BLACK, TIME_FONT_SIZE);
+    lcd_show_string(x_time_start + 5*(TIME_FONT_SIZE/2), y, ":", GREEN, BLACK, TIME_FONT_SIZE, 0);
+    lcd_show_int_num(x_time_start + 6*(TIME_FONT_SIZE/2), y, ds3231_sec, 2, GREEN, BLACK, TIME_FONT_SIZE);
 
-	// Display Day of Week (e.g., "FRI")
-	lcd_show_string(10, 130, "Day:", YELLOW, BLACK, 24, 0);
-	if(ds3231_day >= 1 && ds3231_day <= 7) {
-		lcd_show_string(70, 130, (char*)day_names[ds3231_day-1], YELLOW, BLACK, 24, 0);
-	}
+    // Clear the date area before drawing
+    lcd_fill(0, y + 30, 80, 140, BLACK); // Xóa vùng dưới dòng thời gian
 
-	// Display Date, Month, Year with labels
-	lcd_show_string(10, 160, "Date:", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(82, 160, ds3231_date, 2, YELLOW, BLACK, 24);
-	lcd_show_string(120, 160, "Month:", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(202, 160, ds3231_month, 2, YELLOW, BLACK, 24);
-	// For Year, you might want to add 2000 to the value if you want to display it as 4 digits
-	lcd_show_string(10, 190, "Year:", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(82, 190, ds3231_year + 2000, 4, YELLOW, BLACK, 24);
+    // Display Day of Week
+    y += 30;  // tăng y
+    lcd_show_string(10, y, "Day:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
+    if(ds3231_day >= 1 && ds3231_day <= 7) {
+        lcd_show_string(70, y, (char*)day_names[ds3231_day-1], YELLOW, BLACK, INFO_FONT_SIZE, 0);
+    }
+
+    // Display Date
+    y += y_offset;
+    lcd_show_string(10, y, "Date:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
+    lcd_show_int_num(70, y, ds3231_date, 2, YELLOW, BLACK, INFO_FONT_SIZE);
+    y += y_offset;
+    lcd_show_string(10, y, "Month:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
+    lcd_show_int_num(70, y, ds3231_month, 2, YELLOW, BLACK, INFO_FONT_SIZE);
+
+    // Display Year
+    y += y_offset;
+    lcd_show_string(10, y, "Year:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
+    lcd_show_int_num(70, y, ds3231_year + 2000, 4, YELLOW, BLACK, INFO_FONT_SIZE);
 }
+
 /* USER CODE END 4 */
 
 /**
