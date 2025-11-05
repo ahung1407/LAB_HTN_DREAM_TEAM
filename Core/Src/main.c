@@ -189,21 +189,33 @@ void UpdateTime() {
 }
 
 void DisplayTime() {
+	// Array for abbreviated day names. Note: DS3231 day is 1-7 (Sun-Sat).
+	const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+
 	// Hiển thị Giờ : Phút : Giây
 	lcd_show_int_num(70, 100, ds3231_hours, 2, GREEN, BLACK, 24);
 	lcd_show_string(98, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(110, 100, ds3231_min, 2, GREEN, BLACK, 24);
 	lcd_show_string(138, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(150, 100, ds3231_sec, 2, GREEN, BLACK, 24);
+	
+	// Clear the date area before drawing to prevent ghosting
+	lcd_fill(0, 130, 240, 185, BLACK);
 
-	// Hiển thị Thứ / Ngày / Tháng / Năm
-	lcd_show_int_num(20, 130, ds3231_day, 2, YELLOW, BLACK, 24);
-	lcd_show_string(48, 130, "/", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(70, 130, ds3231_date, 2, YELLOW, BLACK, 24);
-	lcd_show_string(98, 130, "/", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(110, 130, ds3231_month, 2, YELLOW, BLACK, 24);
-	lcd_show_string(138, 130, "/", YELLOW, BLACK, 24, 0);
-	lcd_show_int_num(150, 130, ds3231_year, 2, YELLOW, BLACK, 24);
+	// Display Day of Week (e.g., "FRI")
+	lcd_show_string(10, 130, "Day:", YELLOW, BLACK, 24, 0);
+	if(ds3231_day >= 1 && ds3231_day <= 7) {
+		lcd_show_string(70, 130, (char*)day_names[ds3231_day-1], YELLOW, BLACK, 24, 0);
+	}
+
+	// Display Date, Month, Year with labels
+	lcd_show_string(10, 160, "Date:", YELLOW, BLACK, 24, 0);
+	lcd_show_int_num(82, 160, ds3231_date, 2, YELLOW, BLACK, 24);
+	lcd_show_string(120, 160, "Month:", YELLOW, BLACK, 24, 0);
+	lcd_show_int_num(202, 160, ds3231_month, 2, YELLOW, BLACK, 24);
+	// For Year, you might want to add 2000 to the value if you want to display it as 4 digits
+	lcd_show_string(10, 190, "Year:", YELLOW, BLACK, 24, 0);
+	lcd_show_int_num(82, 190, ds3231_year + 2000, 4, YELLOW, BLACK, 24);
 }
 /* USER CODE END 4 */
 
