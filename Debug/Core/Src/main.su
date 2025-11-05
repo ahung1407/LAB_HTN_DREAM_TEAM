@@ -3,4 +3,4 @@
 ../Core/Src/main.c:168:6:system_init	8	static
 ../Core/Src/main.c:178:6:UpdateTime	8	static
 ../Core/Src/main.c:188:6:DisplayTime	24	static
-../Core/Src/main.c:203:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:209:6:Error_Handler	4	static,ignoring_inline_asm

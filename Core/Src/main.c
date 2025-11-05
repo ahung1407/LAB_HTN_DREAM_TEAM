@@ -187,11 +187,17 @@ void UpdateTime() {
 
 void DisplayTime() {
 	lcd_show_int_num(70, 100, ds3231_hours, 2, GREEN, BLACK, 24);
+	lcd_show_string(98, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(110, 100, ds3231_min, 2, GREEN, BLACK, 24);
+	lcd_show_string(138, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(150, 100, ds3231_sec, 2, GREEN, BLACK, 24);
+
 	lcd_show_int_num(20, 130, ds3231_day, 2, YELLOW, BLACK, 24);
+	lcd_show_string(48, 130, "/", YELLOW, BLACK, 24, 0);
 	lcd_show_int_num(70, 130, ds3231_date, 2, YELLOW, BLACK, 24);
+	lcd_show_string(98, 130, "/", YELLOW, BLACK, 24, 0);
 	lcd_show_int_num(110, 130, ds3231_month, 2, YELLOW, BLACK, 24);
+	lcd_show_string(138, 130, "/", YELLOW, BLACK, 24, 0);
 	lcd_show_int_num(150, 130, ds3231_year, 2, YELLOW, BLACK, 24);
 }
 /* USER CODE END 4 */

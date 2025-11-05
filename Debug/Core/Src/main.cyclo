@@ -3,4 +3,4 @@
 ../Core/Src/main.c:168:6:system_init	1
 ../Core/Src/main.c:178:6:UpdateTime	1
 ../Core/Src/main.c:188:6:DisplayTime	1
-../Core/Src/main.c:203:6:Error_Handler	1
+../Core/Src/main.c:209:6:Error_Handler	1
