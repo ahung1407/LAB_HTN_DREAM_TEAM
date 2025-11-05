@@ -30,6 +30,7 @@
 #include "software_timer.h"
 #include "lcd.h"
 #include "ds3231.h"
+// #include "picture.h" // Tạm thời không sử dụng chức năng hiển thị ảnh
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -105,6 +106,8 @@ int main(void) {
 	// The UpdateTime() function should only be called once to set the initial time for the DS3231 module.
 	// After the first run, you should comment it out to allow the RTC to keep its own time.
 	// UpdateTime();
+
+	// Xóa màn hình về màu đen khi khởi động
 	lcd_clear(BLACK);
 
 	while (1) {
@@ -186,12 +189,14 @@ void UpdateTime() {
 }
 
 void DisplayTime() {
+	// Hiển thị Giờ : Phút : Giây
 	lcd_show_int_num(70, 100, ds3231_hours, 2, GREEN, BLACK, 24);
 	lcd_show_string(98, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(110, 100, ds3231_min, 2, GREEN, BLACK, 24);
 	lcd_show_string(138, 100, ":", GREEN, BLACK, 24, 0);
 	lcd_show_int_num(150, 100, ds3231_sec, 2, GREEN, BLACK, 24);
 
+	// Hiển thị Thứ / Ngày / Tháng / Năm
 	lcd_show_int_num(20, 130, ds3231_day, 2, YELLOW, BLACK, 24);
 	lcd_show_string(48, 130, "/", YELLOW, BLACK, 24, 0);
 	lcd_show_int_num(70, 130, ds3231_date, 2, YELLOW, BLACK, 24);

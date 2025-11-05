@@ -10,5 +10,8 @@
 
 extern const unsigned char gImage_c_flag[37620];
 extern const unsigned char gImage_l_flag[10440];
+// Declare your new background image array here.
+// The size (76800) is for a 240x320 image (240 * 320 * 2 bytes/pixel).
+extern const unsigned char gImage_background[76800];
 
 #endif /* INC_PICTURE_H_ */
