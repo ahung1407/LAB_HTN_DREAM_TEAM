@@ -1,0 +1,6 @@
+../Core/Src/main.c:71:5:main	1
+../Core/Src/main.c:128:6:SystemClock_Config	3
+../Core/Src/main.c:168:6:system_init	1
+../Core/Src/main.c:178:6:UpdateTime	1
+../Core/Src/main.c:188:6:DisplayTime	1
+../Core/Src/main.c:203:6:Error_Handler	1
