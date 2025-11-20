@@ -1,6 +1,9 @@
-../Core/Src/main.c:72:5:main	16	static
-../Core/Src/main.c:137:6:SystemClock_Config	88	static
-../Core/Src/main.c:177:6:system_init	8	static
-../Core/Src/main.c:187:6:UpdateTime	8	static
-../Core/Src/main.c:197:6:DisplayTime	80	static
-../Core/Src/main.c:245:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:89:6:RestoreBackground	40	static
+../Core/Src/main.c:109:5:main	16	static
+../Core/Src/main.c:183:6:SystemClock_Config	88	static
+../Core/Src/main.c:223:6:system_init	8	static
+../Core/Src/main.c:234:6:UpdateTime	8	static
+../Core/Src/main.c:244:6:handle_adjust_mode	72	static
+../Core/Src/main.c:337:6:display_blinking_value	56	static
+../Core/Src/main.c:349:6:DisplayTime	112	static
+../Core/Src/main.c:413:6:Error_Handler	4	static,ignoring_inline_asm

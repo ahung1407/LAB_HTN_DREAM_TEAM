@@ -31,6 +31,8 @@
 #include "lcd.h"
 #include "ds3231.h"
 #include "picture.h" // Tạm thời không sử dụng chức năng hiển thị ảnh
+#include "button.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +52,22 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+// State machine for clock modes
+typedef enum {
+    NORMAL,
+    ADJUST_INIT,
+    ADJUST_HOUR,
+    ADJUST_MIN,
+    ADJUST_DATE,
+    ADJUST_MONTH,
+    ADJUST_YEAR
+} ClockState;
+
+ClockState clockState = NORMAL;
+
+// Temporary variables for time adjustment
+int8_t temp_hours, temp_min, temp_date, temp_month, temp_year;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,11 +76,30 @@ void SystemClock_Config(void);
 void system_init();
 void DisplayTime();
 void UpdateTime();
+void handle_adjust_mode();
+void display_blinking_value(int value, int x, int y, int width, int height, int is_year);
+
+void RestoreBackground(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// This function restores a rectangular part of the background image from the gImage_a buffer.
+void RestoreBackground(uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+    const int screen_width = 240;
+    uint32_t source_offset;
+    uint16_t i, j;
 
+    // lcd_draw_point sets the address for each pixel, so we iterate and call it.
+    for (j = 0; j < height; j++) {
+        for (i = 0; i < width; i++) {
+            source_offset = ((y + j) * screen_width + (x + i)) * 2;
+            uint16_t color = (gImage_a[source_offset] << 8) | gImage_a[source_offset + 1];
+            lcd_draw_point(x + i, y + j, color);
+        }
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -113,16 +150,25 @@ int main(void) {
 	// Ví dụ hiển thị ảnh với kích thước mới (200x45)
 	// Bạn cần đảm bảo mảng gImage_a đã được tạo lại với kích thước tương ứng (18000 bytes)
 	// lcd_show_picture(x, y, width, lenth, image_array);
-	lcd_show_picture(0, 0, 240, 180, gImage_a);
-	lcd_show_picture(100, 220, 140, 80, gImage_b);
+	lcd_show_picture(0, 0, 240, 320, gImage_a);
+
+	timer2_set(50); // Set timer to 50ms to match button scan frequency
 
 	while (1) {
-		ds3231_read_time();
-		DisplayTime();
-		
-		// Add a delay to avoid overwhelming the CPU and flickering the LCD.
-		// Updating the display every 500ms is sufficient.
-		HAL_Delay(500);
+		if(timer2_flag){
+			timer2_flag = 0;
+			button_scan(); // Assuming you have this function in button.c
+
+			if (clockState == NORMAL) {
+				if (is_button_pressed(MODE_BUTTON)) { // Assuming MODE_BUTTON is defined (e.g., index 0)
+					clockState = ADJUST_INIT;
+				}
+				ds3231_read_time(); // Read time only in normal mode
+				DisplayTime();
+			} else {
+				handle_adjust_mode();
+			}
+		}
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
@@ -181,7 +227,8 @@ void system_init() {
 
 	lcd_init();
 	ds3231_init();
-
+	timer2_init();
+	// timer2_set(500); // Moved to main
 }
 
 void UpdateTime() {
@@ -194,46 +241,167 @@ void UpdateTime() {
 	ds3231_write(ADDRESS_SEC, 23);
 }
 
-void DisplayTime() {
-    // Array for abbreviated day names. Note: DS3231 day is 1-7 (Sun-Sat).
-    const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-	const uint8_t TIME_FONT_SIZE = 24;
-	const uint8_t INFO_FONT_SIZE = 16;
-	const int y_offset = 20;   // Khoảng cách giữa các dòng
-	int y = 180;               // y bắt đầu cho giờ
+void handle_adjust_mode() {
+    static uint8_t blink_counter = 0; // 50ms tick
+    blink_counter = (blink_counter + 1) % 10; // Blink at 2Hz (50ms * 10 = 500ms cycle)
 
-    // Hiển thị Giờ : Phút : Giây
-    // Căn giữa dòng thời gian
-    int time_str_width = 2 * (TIME_FONT_SIZE/2) + 1 * (TIME_FONT_SIZE/2) + 2 * (TIME_FONT_SIZE/2) + 1 * (TIME_FONT_SIZE/2) + 2 * (TIME_FONT_SIZE/2);
-    int x_time_start = (lcddev.width - time_str_width) / 2;
-    lcd_show_int_num(x_time_start, y, ds3231_hours, 2, GREEN, BLACK, TIME_FONT_SIZE);
-    lcd_show_string(x_time_start + 2*(TIME_FONT_SIZE/2), y, ":", GREEN, BLACK, TIME_FONT_SIZE, 0);
-    lcd_show_int_num(x_time_start + 3*(TIME_FONT_SIZE/2), y, ds3231_min, 2, GREEN, BLACK, TIME_FONT_SIZE);
-    lcd_show_string(x_time_start + 5*(TIME_FONT_SIZE/2), y, ":", GREEN, BLACK, TIME_FONT_SIZE, 0);
-    lcd_show_int_num(x_time_start + 6*(TIME_FONT_SIZE/2), y, ds3231_sec, 2, GREEN, BLACK, TIME_FONT_SIZE);
+    switch (clockState) {
+        case ADJUST_INIT:
+            // Load current time into temporary variables
+            temp_hours = ds3231_hours;
+            temp_min = ds3231_min;
+            temp_date = ds3231_date;
+            temp_month = ds3231_month;
+            temp_year = ds3231_year;
+            clockState = ADJUST_HOUR;
+            break;
 
-    // Clear the date area before drawing
-    lcd_fill(0, y + 30, 80, 140, BLACK); // Xóa vùng dưới dòng thời gian
+        case ADJUST_HOUR:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_hours = (temp_hours + 1) % 24;
+            if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_MIN;
+            if (blink_counter < 5) display_blinking_value(temp_hours, 40, 20, 32, 16, 0); else RestoreBackground(40, 20, 32, 16);
+            break;
 
-    // Display Day of Week
-    y += 30;  // tăng y
-    lcd_show_string(10, y, "Day:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
-    if(ds3231_day >= 1 && ds3231_day <= 7) {
-        lcd_show_string(70, y, (char*)day_names[ds3231_day-1], YELLOW, BLACK, INFO_FONT_SIZE, 0);
+        case ADJUST_MIN:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_min = (temp_min + 1) % 60;
+            if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_DATE;
+            if (blink_counter < 5) display_blinking_value(temp_min, 80, 20, 32, 16, 0); else RestoreBackground(80, 20, 32, 16);
+            break;
+
+        case ADJUST_DATE:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { if(++temp_date > 31) temp_date = 1; }
+            if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_MONTH;
+            if (blink_counter < 5) display_blinking_value(temp_date, 110, 20 + 2 * (16 + 8), 32, 16, 0); else RestoreBackground(110, 20 + 2 * (16 + 8), 32, 16);
+            break;
+
+        case ADJUST_MONTH:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { if(++temp_month > 12) temp_month = 1; }
+            if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_YEAR;
+            if (blink_counter < 5) display_blinking_value(temp_month, 120, 20 + 3 * (16 + 8), 32, 16, 0); else RestoreBackground(120, 20 + 3 * (16 + 8), 32, 16);
+            break;
+
+        case ADJUST_YEAR:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_year = (temp_year + 1) % 100;
+            if (is_button_pressed(SET_BUTTON)) {
+                // Save all temp values to RTC
+                ds3231_write(ADDRESS_HOUR, temp_hours);
+                ds3231_write(ADDRESS_MIN, temp_min);
+                ds3231_write(ADDRESS_DATE, temp_date);
+                ds3231_write(ADDRESS_MONTH, temp_month);
+                ds3231_write(ADDRESS_YEAR, temp_year);
+                // Exit adjust mode
+                clockState = NORMAL;
+                // Force a full redraw on next DisplayTime call
+				ds3231_sec = -1;
+            }
+            if (blink_counter < 5) display_blinking_value(temp_year, 110, 20 + 4 * (16 + 8), 64, 16, 1); else RestoreBackground(110, 20 + 4 * (16 + 8), 64, 16);
+            break;
+
+        default:
+            clockState = NORMAL;
+            break;
     }
 
-    // Display Date
-    y += y_offset;
-    lcd_show_string(10, y, "Date:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
-    lcd_show_int_num(70, y, ds3231_date, 2, YELLOW, BLACK, INFO_FONT_SIZE);
-    y += y_offset;
-    lcd_show_string(10, y, "Month:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
-    lcd_show_int_num(70, y, ds3231_month, 2, YELLOW, BLACK, INFO_FONT_SIZE);
+    // If in any adjust sub-state, display the temporary (non-blinking) values
+    if (clockState > ADJUST_INIT) {
+        char buf[25];
+        const uint8_t FONT_SIZE = 16;
+        const int x_start = 40;
+        const int y_start = 20;
+        const int line_height = FONT_SIZE + 8;
 
-    // Display Year
-    y += y_offset;
-    lcd_show_string(10, y, "Year:", YELLOW, BLACK, INFO_FONT_SIZE, 0);
-    lcd_show_int_num(70, y, ds3231_year + 2000, 4, YELLOW, BLACK, INFO_FONT_SIZE);
+        // Display non-blinking parts
+        if (clockState != ADJUST_HOUR) {
+            sprintf(buf, "%02d", temp_hours);
+            lcd_show_string(x_start, y_start, buf, GREEN, 0, FONT_SIZE, 1);
+        }
+        if (clockState != ADJUST_MIN) {
+            sprintf(buf, ":%02d", temp_min);
+            lcd_show_string(x_start + 32, y_start, buf, GREEN, 0, FONT_SIZE, 1);
+        }
+        if (clockState != ADJUST_DATE) {
+            sprintf(buf, "Date: %02d", temp_date);
+            lcd_show_string(x_start, y_start + 2 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        }
+        if (clockState != ADJUST_MONTH) {
+            sprintf(buf, "Month: %02d", temp_month);
+            lcd_show_string(x_start, y_start + 3 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        }
+        if (clockState != ADJUST_YEAR) {
+            sprintf(buf, "Year: %04d", temp_year + 2000);
+            lcd_show_string(x_start, y_start + 4 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        }
+    }
+}
+
+void display_blinking_value(int value, int x, int y, int width, int height, int is_year) {
+    char buf[10];
+    const uint8_t FONT_SIZE = 16;
+    RestoreBackground(x, y, width, height);
+    if (is_year) {
+        sprintf(buf, "Year: %04d", value + 2000);
+    } else {
+        sprintf(buf, "%02d", value);
+    }
+    lcd_show_string(x, y, buf, RED, 0, FONT_SIZE, 1); // Use RED to indicate editing
+}
+
+void DisplayTime() {
+    // Static variables to store previous values to update only changed parts
+    static int8_t prev_sec = -1, prev_min = -1, prev_hours = -1;
+    static int8_t prev_day = -1, prev_date = -1, prev_month = -1, prev_year = -1;
+
+    const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+    const uint8_t FONT_SIZE = 16;
+    char buf[25];
+
+    // Define coordinates and dimensions for each field
+    const int x_start = 40;
+    const int y_start = 20;
+    const int line_height = FONT_SIZE + 8;
+	const int text_width = 150;
+
+    // Time: 00:00:00
+    if (ds3231_hours != prev_hours || ds3231_min != prev_min || ds3231_sec != prev_sec) {
+        if(prev_sec != -1) RestoreBackground(x_start, y_start, text_width, FONT_SIZE); // Avoid clearing on first run
+        sprintf(buf, "%02d:%02d:%02d", ds3231_hours, ds3231_min, ds3231_sec);
+        lcd_show_string(x_start, y_start, buf, GREEN, 0, FONT_SIZE, 1);
+        prev_hours = ds3231_hours;
+        prev_min = ds3231_min;
+        prev_sec = ds3231_sec;
+    }
+
+    // Day
+    if (ds3231_day != prev_day) {
+    	if(prev_day != -1) RestoreBackground(x_start, y_start + line_height, text_width, FONT_SIZE);
+        sprintf(buf, "Day: %s", (ds3231_day >= 1 && ds3231_day <= 7) ? day_names[ds3231_day - 1] : "N/A");
+        lcd_show_string(x_start, y_start + line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        prev_day = ds3231_day;
+    }
+
+    // Date
+    if (ds3231_date != prev_date || prev_sec == -1) { // Also draw on first run
+    	if(prev_date != -1) RestoreBackground(x_start, y_start + 2 * line_height, text_width, FONT_SIZE);
+        sprintf(buf, "Date: %02d", ds3231_date);
+        lcd_show_string(x_start, y_start + 2 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        prev_date = ds3231_date;
+    }
+
+    // Month
+    if (ds3231_month != prev_month || prev_sec == -1) {
+    	if(prev_month != -1) RestoreBackground(x_start, y_start + 3 * line_height, text_width, FONT_SIZE);
+        sprintf(buf, "Month: %02d", ds3231_month);
+        lcd_show_string(x_start, y_start + 3 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        prev_month = ds3231_month;
+    }
+
+    // Year
+    if (ds3231_year != prev_year || prev_sec == -1) {
+    	if(prev_year != -1) RestoreBackground(x_start, y_start + 4 * line_height, text_width, FONT_SIZE);
+        sprintf(buf, "Year: %04d", ds3231_year + 2000);
+        lcd_show_string(x_start, y_start + 4 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
+        prev_year = ds3231_year;
+    }
 }
 
 /* USER CODE END 4 */

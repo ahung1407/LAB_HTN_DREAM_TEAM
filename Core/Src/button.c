@@ -53,3 +53,26 @@ void button_scan() {
 	}
 }
 
+/**
+ * @brief  	Check if a button is pressed (single press event)
+ * @param  	i: button index
+ * @retval 	1 if pressed, 0 otherwise
+ */
+int is_button_pressed(int i) {
+	if (button_count[i] == 1) {
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * @brief  	Check if a button is held long enough for auto-repeat
+ * @note    The auto-repeat triggers every 200ms, which is 4 scan cycles (4 * 50ms)
+ * @param  	i: button index
+ * @retval 	1 if held, 0 otherwise
+ */
+int is_button_long_pressed(int i) {
+	if (BUTTON_IS_PRESSED_S && (button_count[i] % 4 == 0)) // 4 * 50ms = 200ms
+		return 1;
+	return 0;
+}
