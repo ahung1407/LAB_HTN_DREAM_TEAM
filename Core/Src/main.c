@@ -57,6 +57,7 @@ typedef enum {
     NORMAL,
     ADJUST_INIT,
     ADJUST_HOUR,
+    ADJUST_DAY,
     ADJUST_MIN,
     ADJUST_DATE,
     ADJUST_MONTH,
@@ -66,7 +67,13 @@ typedef enum {
 ClockState clockState = NORMAL;
 
 // Temporary variables for time adjustment
-int8_t temp_hours, temp_min, temp_date, temp_month, temp_year;
+int8_t temp_hours, temp_min, temp_day, temp_date, temp_month, temp_year;
+
+// Static variables to store previous values to update only changed parts
+static int8_t prev_sec = -1, prev_min = -1, prev_hours = -1; // For NORMAL mode
+static int8_t prev_day = -1, prev_date = -1, prev_month = -1, prev_year = -1;
+static int8_t prev_temp_hours = -1, prev_temp_min = -1, prev_temp_date = -1, prev_temp_month = -1, prev_temp_year = -1; // For ADJUST mode
+
 
 /* USER CODE END PV */
 
@@ -77,7 +84,6 @@ void system_init();
 void DisplayTime();
 void UpdateTime();
 void handle_adjust_mode();
-void display_blinking_value(int value, int x, int y, int width, int height, int is_year);
 
 void RestoreBackground(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 
@@ -162,12 +168,16 @@ int main(void) {
 			if (clockState == NORMAL) {
 				if (is_button_pressed(MODE_BUTTON)) { // Assuming MODE_BUTTON is defined (e.g., index 0)
 					clockState = ADJUST_INIT;
+					// Force a full redraw on next DisplayTime call by invalidating a prev value
+					// This will trigger the redraw logic in DisplayTime
+					prev_sec = -1;
+					ds3231_read_time(); // Read current time before adjusting
 				}
 				ds3231_read_time(); // Read time only in normal mode
-				DisplayTime();
 			} else {
 				handle_adjust_mode();
 			}
+			DisplayTime(); // Always display, DisplayTime will handle different states
 		}
 		/* USER CODE END WHILE */
 
@@ -242,14 +252,13 @@ void UpdateTime() {
 }
 
 void handle_adjust_mode() {
-    static uint8_t blink_counter = 0; // 50ms tick
-    blink_counter = (blink_counter + 1) % 10; // Blink at 2Hz (50ms * 10 = 500ms cycle)
 
     switch (clockState) {
         case ADJUST_INIT:
             // Load current time into temporary variables
             temp_hours = ds3231_hours;
             temp_min = ds3231_min;
+            temp_day = ds3231_day;
             temp_date = ds3231_date;
             temp_month = ds3231_month;
             temp_year = ds3231_year;
@@ -258,30 +267,37 @@ void handle_adjust_mode() {
 
         case ADJUST_HOUR:
             if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_hours = (temp_hours + 1) % 24;
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_hours--; if(temp_hours < 0) temp_hours = 23; }
             if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_MIN;
-            if (blink_counter < 5) display_blinking_value(temp_hours, 40, 20, 32, 16, 0); else RestoreBackground(40, 20, 32, 16);
             break;
 
         case ADJUST_MIN:
             if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_min = (temp_min + 1) % 60;
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_min--; if(temp_min < 0) temp_min = 59; }
+            if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_DAY;
+            break;
+
+        case ADJUST_DAY:
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { temp_day++; if(temp_day > 7) temp_day = 1; }
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_day--; if(temp_day < 1) temp_day = 7; }
             if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_DATE;
-            if (blink_counter < 5) display_blinking_value(temp_min, 80, 20, 32, 16, 0); else RestoreBackground(80, 20, 32, 16);
             break;
 
         case ADJUST_DATE:
-            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { if(++temp_date > 31) temp_date = 1; }
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { temp_date++; if(temp_date > 31) temp_date = 1; }
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_date--; if(temp_date < 1) temp_date = 31; }
             if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_MONTH;
-            if (blink_counter < 5) display_blinking_value(temp_date, 110, 20 + 2 * (16 + 8), 32, 16, 0); else RestoreBackground(110, 20 + 2 * (16 + 8), 32, 16);
             break;
 
         case ADJUST_MONTH:
-            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { if(++temp_month > 12) temp_month = 1; }
+            if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) { temp_month++; if(temp_month > 12) temp_month = 1; }
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_month--; if(temp_month < 1) temp_month = 12; }
             if (is_button_pressed(SET_BUTTON)) clockState = ADJUST_YEAR;
-            if (blink_counter < 5) display_blinking_value(temp_month, 120, 20 + 3 * (16 + 8), 32, 16, 0); else RestoreBackground(120, 20 + 3 * (16 + 8), 32, 16);
             break;
 
         case ADJUST_YEAR:
             if (is_button_pressed(UP_BUTTON) || is_button_long_pressed(UP_BUTTON)) temp_year = (temp_year + 1) % 100;
+            if (is_button_pressed(DOWN_BUTTON) || is_button_long_pressed(DOWN_BUTTON)) { temp_year--; if(temp_year < 0) temp_year = 99; }
             if (is_button_pressed(SET_BUTTON)) {
                 // Save all temp values to RTC
                 ds3231_write(ADDRESS_HOUR, temp_hours);
@@ -294,113 +310,135 @@ void handle_adjust_mode() {
                 // Force a full redraw on next DisplayTime call
 				ds3231_sec = -1;
             }
-            if (blink_counter < 5) display_blinking_value(temp_year, 110, 20 + 4 * (16 + 8), 64, 16, 1); else RestoreBackground(110, 20 + 4 * (16 + 8), 64, 16);
             break;
 
         default:
             clockState = NORMAL;
             break;
     }
-
-    // If in any adjust sub-state, display the temporary (non-blinking) values
-    if (clockState > ADJUST_INIT) {
-        char buf[25];
-        const uint8_t FONT_SIZE = 16;
-        const int x_start = 40;
-        const int y_start = 20;
-        const int line_height = FONT_SIZE + 8;
-
-        // Display non-blinking parts
-        if (clockState != ADJUST_HOUR) {
-            sprintf(buf, "%02d", temp_hours);
-            lcd_show_string(x_start, y_start, buf, GREEN, 0, FONT_SIZE, 1);
-        }
-        if (clockState != ADJUST_MIN) {
-            sprintf(buf, ":%02d", temp_min);
-            lcd_show_string(x_start + 32, y_start, buf, GREEN, 0, FONT_SIZE, 1);
-        }
-        if (clockState != ADJUST_DATE) {
-            sprintf(buf, "Date: %02d", temp_date);
-            lcd_show_string(x_start, y_start + 2 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        }
-        if (clockState != ADJUST_MONTH) {
-            sprintf(buf, "Month: %02d", temp_month);
-            lcd_show_string(x_start, y_start + 3 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        }
-        if (clockState != ADJUST_YEAR) {
-            sprintf(buf, "Year: %04d", temp_year + 2000);
-            lcd_show_string(x_start, y_start + 4 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        }
-    }
-}
-
-void display_blinking_value(int value, int x, int y, int width, int height, int is_year) {
-    char buf[10];
-    const uint8_t FONT_SIZE = 16;
-    RestoreBackground(x, y, width, height);
-    if (is_year) {
-        sprintf(buf, "Year: %04d", value + 2000);
-    } else {
-        sprintf(buf, "%02d", value);
-    }
-    lcd_show_string(x, y, buf, RED, 0, FONT_SIZE, 1); // Use RED to indicate editing
 }
 
 void DisplayTime() {
-    // Static variables to store previous values to update only changed parts
-    static int8_t prev_sec = -1, prev_min = -1, prev_hours = -1;
-    static int8_t prev_day = -1, prev_date = -1, prev_month = -1, prev_year = -1;
+	static uint8_t blink_counter = 0;
+	blink_counter = (blink_counter + 1) % 10; // 50ms * 10 = 500ms cycle for 2Hz blink
 
     const char* day_names[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
     const uint8_t FONT_SIZE = 16;
     char buf[25];
 
     // Define coordinates and dimensions for each field
-    const int x_start = 40;
-    const int y_start = 20;
+    const int x_time = 40;
+    const int y_time = 20;
     const int line_height = FONT_SIZE + 8;
 	const int text_width = 150;
 
-    // Time: 00:00:00
-    if (ds3231_hours != prev_hours || ds3231_min != prev_min || ds3231_sec != prev_sec) {
-        if(prev_sec != -1) RestoreBackground(x_start, y_start, text_width, FONT_SIZE); // Avoid clearing on first run
-        sprintf(buf, "%02d:%02d:%02d", ds3231_hours, ds3231_min, ds3231_sec);
-        lcd_show_string(x_start, y_start, buf, GREEN, 0, FONT_SIZE, 1);
-        prev_hours = ds3231_hours;
-        prev_min = ds3231_min;
-        prev_sec = ds3231_sec;
-    }
+	// Use different variables depending on the mode
+	int8_t current_hours = (clockState == NORMAL) ? ds3231_hours : temp_hours;
+	int8_t current_min = (clockState == NORMAL) ? ds3231_min : temp_min;
+	int8_t current_sec = (clockState == NORMAL) ? ds3231_sec : 0;
+	int8_t current_day = (clockState == NORMAL) ? ds3231_day : temp_day;
+	int8_t current_date = (clockState == NORMAL) ? ds3231_date : temp_date;
+	int8_t current_month = (clockState == NORMAL) ? ds3231_month : temp_month;
+	int8_t current_year = (clockState == NORMAL) ? ds3231_year : temp_year;
+
+	int8_t* p_prev_hours = (clockState == NORMAL) ? &prev_hours : &prev_temp_hours;
+	int8_t* p_prev_min = (clockState == NORMAL) ? &prev_min : &prev_temp_min;
+	int8_t* p_prev_sec = (clockState == NORMAL) ? &prev_sec : &prev_sec; // Use normal prev_sec
+	int8_t* p_prev_day = (clockState == NORMAL) ? &prev_day : &prev_day; // Day is also adjusted now
+	int8_t* p_prev_date = (clockState == NORMAL) ? &prev_date : &prev_temp_date;
+	int8_t* p_prev_month = (clockState == NORMAL) ? &prev_month : &prev_temp_month;
+	int8_t* p_prev_year = (clockState == NORMAL) ? &prev_year : &prev_temp_year;
+
+	// On mode change, invalidate all previous values to force redraw
+	static ClockState prevState = NORMAL;
+	if (clockState != prevState) {
+		// When switching modes, invalidate all previous values to force a full redraw
+		// and clear the entire display area once.
+		prev_sec = -1; prev_min = -1; prev_hours = -1;
+		prev_day = -1; prev_date = -1; prev_month = -1; prev_year = -1;
+		prev_temp_hours = -1; prev_temp_min = -1; prev_temp_date = -1; prev_temp_month = -1; prev_temp_year = -1;
+
+		// Clear the entire display area when switching modes
+		RestoreBackground(x_time, y_time, text_width, (FONT_SIZE + line_height) * 5);
+
+		prevState = clockState;
+	}
+
+	// --- Time Display ---
+	// Redraw the entire time line if any part of it changes or is being adjusted
+	if (current_hours != *p_prev_hours || current_min != *p_prev_min || (clockState == NORMAL && current_sec != *p_prev_sec) || clockState == ADJUST_HOUR || clockState == ADJUST_MIN) {
+		RestoreBackground(x_time, y_time, text_width, FONT_SIZE);
+
+		if (clockState != ADJUST_HOUR || blink_counter < 5) {
+			sprintf(buf, "%02d", current_hours);
+			lcd_show_string(x_time, y_time, buf, (clockState == ADJUST_HOUR) ? RED : GREEN, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time, y_time, 2 * 8, FONT_SIZE); // 2 chars * 8 pixels/char
+		}
+		*p_prev_hours = current_hours;
+
+		if (clockState != ADJUST_MIN || blink_counter < 5) {
+			sprintf(buf, ":%02d", current_min);
+			lcd_show_string(x_time + 2*8, y_time, buf, (clockState == ADJUST_MIN) ? RED : GREEN, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time + 3*8, y_time, 2 * 8, FONT_SIZE);
+		}
+		*p_prev_min = current_min;
+
+		if (clockState == NORMAL) { // Only show seconds in normal mode
+			sprintf(buf, ":%02d", current_sec);
+			lcd_show_string(x_time + 5*8, y_time, buf, GREEN, 0, FONT_SIZE, 1);
+		}
+		*p_prev_sec = current_sec;
+	}
+
 
     // Day
-    if (ds3231_day != prev_day) {
-    	if(prev_day != -1) RestoreBackground(x_start, y_start + line_height, text_width, FONT_SIZE);
-        sprintf(buf, "Day: %s", (ds3231_day >= 1 && ds3231_day <= 7) ? day_names[ds3231_day - 1] : "N/A");
-        lcd_show_string(x_start, y_start + line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        prev_day = ds3231_day;
+    if (current_day != *p_prev_day || clockState == ADJUST_DAY) {
+		if (clockState != ADJUST_DAY || blink_counter < 5) {
+        sprintf(buf, "Day: %s", (current_day >= 1 && current_day <= 7) ? day_names[current_day - 1] : "N/A");
+			lcd_show_string(x_time, y_time + line_height, buf, (clockState == ADJUST_DAY) ? RED : YELLOW, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time, y_time + line_height, text_width, FONT_SIZE + 2);
+		}
+        *p_prev_day = current_day;
     }
 
     // Date
-    if (ds3231_date != prev_date || prev_sec == -1) { // Also draw on first run
-    	if(prev_date != -1) RestoreBackground(x_start, y_start + 2 * line_height, text_width, FONT_SIZE);
-        sprintf(buf, "Date: %02d", ds3231_date);
-        lcd_show_string(x_start, y_start + 2 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        prev_date = ds3231_date;
+    if (current_date != *p_prev_date || clockState == ADJUST_DATE) {
+		// Clear the area first to prevent artifacts
+		RestoreBackground(x_time, y_time + 2 * line_height, text_width, FONT_SIZE + 2);
+		if (clockState != ADJUST_DATE || blink_counter < 5) {
+			sprintf(buf, "Date: %02d", current_date);
+			lcd_show_string(x_time, y_time + 2 * line_height, buf, (clockState == ADJUST_DATE) ? RED : YELLOW, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time, y_time + 2 * line_height, text_width, FONT_SIZE + 2);
+		}
+        *p_prev_date = current_date;
     }
 
     // Month
-    if (ds3231_month != prev_month || prev_sec == -1) {
-    	if(prev_month != -1) RestoreBackground(x_start, y_start + 3 * line_height, text_width, FONT_SIZE);
-        sprintf(buf, "Month: %02d", ds3231_month);
-        lcd_show_string(x_start, y_start + 3 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        prev_month = ds3231_month;
+    if (current_month != *p_prev_month || clockState == ADJUST_MONTH) {
+		RestoreBackground(x_time, y_time + 3 * line_height, text_width, FONT_SIZE + 2);
+		if (clockState != ADJUST_MONTH || blink_counter < 5) {
+			sprintf(buf, "Month: %02d", current_month);
+			lcd_show_string(x_time, y_time + 3 * line_height, buf, (clockState == ADJUST_MONTH) ? RED : YELLOW, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time, y_time + 3 * line_height, text_width, FONT_SIZE + 2);
+		}
+        *p_prev_month = current_month;
     }
 
     // Year
-    if (ds3231_year != prev_year || prev_sec == -1) {
-    	if(prev_year != -1) RestoreBackground(x_start, y_start + 4 * line_height, text_width, FONT_SIZE);
-        sprintf(buf, "Year: %04d", ds3231_year + 2000);
-        lcd_show_string(x_start, y_start + 4 * line_height, buf, YELLOW, 0, FONT_SIZE, 1);
-        prev_year = ds3231_year;
+    if (current_year != *p_prev_year || clockState == ADJUST_YEAR) {
+		RestoreBackground(x_time, y_time + 4 * line_height, text_width, FONT_SIZE + 2);
+		if (clockState != ADJUST_YEAR || blink_counter < 5) {
+			sprintf(buf, "Year: %04d", current_year + 2000);
+			lcd_show_string(x_time, y_time + 4 * line_height, buf, (clockState == ADJUST_YEAR) ? RED : YELLOW, 0, FONT_SIZE, 1);
+		} else {
+			RestoreBackground(x_time, y_time + 4 * line_height, text_width, FONT_SIZE);
+		}
+        *p_prev_year = current_year;
     }
 }
 

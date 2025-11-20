@@ -8,9 +8,10 @@
 #include "main.h"
 
 // Define button indices
-#define UP_BUTTON       1  // Button for increasing value
-#define MODE_BUTTON     2  // Button for changing mode
-#define SET_BUTTON      3  // Button for setting/confirming value
+#define DOWN_BUTTON     7  // Button for decreasing value
+#define UP_BUTTON       3  // Button for increasing value
+#define MODE_BUTTON     0  // Button for changing mode
+#define SET_BUTTON      12  // Button for setting/confirming value
 
 // Define button press durations (in terms of scan cycles, e.g., 50ms per cycle)
 #define DURATION_FOR_AUTO_INCREASING  20 // 20 * 50ms = 1s
